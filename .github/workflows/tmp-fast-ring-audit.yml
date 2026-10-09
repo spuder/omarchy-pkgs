@@ -27,13 +27,13 @@ jobs:
           persist-credentials: false
       - name: Build the edge builder image
         run: |
-          source helpers/message-helpers.sh; source helpers/docker-helpers.sh
+          export BUILD_ROOT=$PWD; source helpers/message-helpers.sh; source helpers/docker-helpers.sh
           build_docker_image build "$ARCH" edge
       - name: Check every published fast-ring package
         run: |
           set -uo pipefail
           sudo apt-get install -y -qq libarchive-tools zstd >/dev/null
-          source helpers/paths.sh; source helpers/package-metadata.sh
+          export BUILD_ROOT=$PWD; source helpers/paths.sh; source helpers/package-metadata.sh
           mkdir -p db pkgs
           curl -fsSL "https://pkgs.omarchy.org/edge/$ARCH/omarchy.db.tar.zst" | bsdtar -xf - -C db
           # pkgbase -> filenames, from the published database.
