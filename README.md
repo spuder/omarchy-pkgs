@@ -184,14 +184,20 @@ combined. And after a fast-ring package builds, `build-pr.yml` runs
 `bin/check-fast-ring`, which installs the package on `edge`, `rc` and `stable`
 from each channel's own repositories and fails the build when:
 
-- a dependency cannot be satisfied on `rc` or `stable`;
+- a dependency that edge provides cannot be satisfied on `rc` or `stable`;
 - a binary needs a library or a versioned symbol (`GLIBC_2.43`, say) that
   `rc` or `stable` does not have yet (`ldd -r`). Edge is the baseline: an
   optional plugin whose library is missing on every channel is not the fast
   ring's concern;
-- a binary links Qt or libpython, or the package installs Python modules.
-  These break on a dependency update without a missing symbol to show it:
-  Qt's private API and plugin version check, Python's versioned module path.
+- the package installs Python modules, or it is compiled here (its PKGBUILD
+  has a `build()`) and a binary links Qt or libpython. These break on a
+  dependency update without a missing symbol to show it: Qt's private API and
+  plugin version check, Python's versioned module path. A vendor's binary is
+  the same bytes whatever we rebuild, so for it only the library check
+  applies.
+
+On aarch64 every channel runs the same live Arch Linux ARM repositories, so
+only the rules are checked there.
 
 A package that fails the check comes off the fast ring; nothing else about it
 changes.
