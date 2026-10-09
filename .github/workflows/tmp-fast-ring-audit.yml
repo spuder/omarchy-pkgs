@@ -32,7 +32,7 @@ jobs:
       - name: Check every published fast-ring package
         run: |
           set -uo pipefail
-          sudo apt-get install -y -qq libarchive-tools zstd >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-tools zstd >/dev/null
           export BUILD_ROOT=$PWD; source helpers/paths.sh; source helpers/package-metadata.sh
           mkdir -p db pkgs
           curl -fsSL "https://pkgs.omarchy.org/edge/$ARCH/omarchy.db.tar.zst" | bsdtar -xf - -C db
@@ -52,7 +52,7 @@ jobs:
             done
             echo "::group::$pkg"
             compiled=()
-            grep -qE '^[[:space:]]*build[[:space:]]*\(\)' "$dir/PKGBUILD" && compiled=(--compiled)
+            grep -qE '^[[:space:]]*(function[[:space:]]+)?build[[:space:]]*(\([[:space:]]*\))?[[:space:]]*(\{|$)' "$dir/PKGBUILD" && compiled=(--compiled)
             if bin/check-fast-ring --arch "$ARCH" --channels "rc stable" "${compiled[@]}" "${paths[@]}"; then
               echo "$pkg PASS" >> results.txt
             else
