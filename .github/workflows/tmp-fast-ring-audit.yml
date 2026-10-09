@@ -1,0 +1,65 @@
+name: Temporary fast-ring audit
+
+# Throwaway: runs bin/check-fast-ring against the files edge already
+# publishes for every fast-ring package. Delete with the branch.
+on:
+  push:
+    branches: [tmp/fast-ring-audit]
+
+jobs:
+  audit:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    env:
+      CONTAINER_ENGINE: docker
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build the edge builder image
+        run: |
+          source helpers/message-helpers.sh; source helpers/docker-helpers.sh
+          build_docker_image build "$ARCH" edge
+      - name: Check every published fast-ring package
+        run: |
+          set -uo pipefail
+          sudo apt-get install -y -qq libarchive-tools zstd >/dev/null
+          source helpers/paths.sh; source helpers/package-metadata.sh
+          mkdir -p db pkgs
+          curl -fsSL "https://pkgs.omarchy.org/edge/$ARCH/omarchy.db.tar.zst" | bsdtar -xf - -C db
+          # pkgbase -> filenames, from the published database.
+          for desc in db/*/desc; do
+            awk '/^%FILENAME%/{getline; f=$0} /^%BASE%/{getline; b=$0} /^%NAME%/{getline; n=$0} END{print (b?b:n), f}' "$desc"
+          done > files.txt
+          : > results.txt
+          for dir in pkgbuilds/*/; do
+            pkg=$(basename "$dir")
+            package_is_fast_ring "${dir%/}" || continue
+            mapfile -t files < <(awk -v p="$pkg" '$1 == p {print $2}' files.txt)
+            [[ ${#files[@]} -gt 0 ]] || { echo "$pkg SKIP not-on-edge-$ARCH" >> results.txt; continue; }
+            paths=()
+            for f in "${files[@]}"; do
+              curl -fsSL "https://pkgs.omarchy.org/edge/$ARCH/$f" -o "pkgs/$f" && paths+=("pkgs/$f")
+            done
+            echo "::group::$pkg"
+            if bin/check-fast-ring --arch "$ARCH" --channels "rc stable" "${paths[@]}"; then
+              echo "$pkg PASS" >> results.txt
+            else
+              echo "$pkg FAIL" >> results.txt
+            fi
+            echo "::endgroup::"
+            rm -f pkgs/*
+            docker system prune -f >/dev/null
+          done
+          echo "### $ARCH" >> "$GITHUB_STEP_SUMMARY"
+          sed 's/^/- /' results.txt >> "$GITHUB_STEP_SUMMARY"
+          cat results.txt
