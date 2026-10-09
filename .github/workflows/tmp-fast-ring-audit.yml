@@ -51,7 +51,9 @@ jobs:
               curl -fsSL "https://pkgs.omarchy.org/edge/$ARCH/$f" -o "pkgs/$f" && paths+=("pkgs/$f")
             done
             echo "::group::$pkg"
-            if bin/check-fast-ring --arch "$ARCH" --channels "rc stable" "${paths[@]}"; then
+            compiled=()
+            grep -qE '^[[:space:]]*build[[:space:]]*\(\)' "$dir/PKGBUILD" && compiled=(--compiled)
+            if bin/check-fast-ring --arch "$ARCH" --channels "rc stable" "${compiled[@]}" "${paths[@]}"; then
               echo "$pkg PASS" >> results.txt
             else
               echo "$pkg FAIL" >> results.txt
